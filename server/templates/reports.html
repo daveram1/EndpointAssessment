@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Reports</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Check Results Summary (Last 24 Hours)</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tr>
+                        <th>Total Results:</th>
+                        <td>{{ total_results }}</td>
+                    </tr>
+                    <tr>
+                        <th><span class="badge bg-success">Passed</span></th>
+                        <td>{{ passed }}</td>
+                    </tr>
+                    <tr>
+                        <th><span class="badge bg-danger">Failed</span></th>
+                        <td>{{ failed }}</td>
+                    </tr>
+                    <tr>
+                        <th><span class="badge bg-warning">Errors</span></th>
+                        <td>{{ errors }}</td>
+                    </tr>
+                </table>
+
+                {% if total_results > 0 %}
+                <div class="progress" style="height: 30px;">
+                    {% let pass_pct = (passed as f64 / total_results as f64 * 100.0) as i64 %}
+                    {% let fail_pct = (failed as f64 / total_results as f64 * 100.0) as i64 %}
+                    {% let error_pct = (errors as f64 / total_results as f64 * 100.0) as i64 %}
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ pass_pct }}%">{{ pass_pct }}%</div>
+                    <div class="progress-bar bg-danger" role="progressbar" style="width: {{ fail_pct }}%">{{ fail_pct }}%</div>
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ error_pct }}%">{{ error_pct }}%</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">API Export</h5>
+            </div>
+            <div class="card-body">
+                <p>Export data via the REST API:</p>
+                <ul>
+                    <li><code>GET /api/endpoints</code> - All endpoints</li>
+                    <li><code>GET /api/checks</code> - All check definitions</li>
+                    <li><code>GET /api/results</code> - Recent check results</li>
+                    <li><code>GET /api/reports/summary</code> - Dashboard summary</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = [
+    "common",
+    "server",
+    "agent",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Endpoint Assessment Team"]
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "trace", "cors"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+# Utilities
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# System info
+sysinfo = "0.30"
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Password hashing
+argon2 = "0.5"
+
+# Templates
+askama = { version = "0.12", features = ["with-axum"] }
+askama_axum = "0.4"
+
+# Regex for pattern matching
+regex = "1.10"

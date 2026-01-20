@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+    <a href="/checks" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                {% match check %}
+                {% when Some with (c) %}
+                <form method="POST" action="/checks/{{ c.id }}">
+                {% when None %}
+                <form method="POST" action="/checks">
+                {% endmatch %}
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required
+                            value="{% match check %}{% when Some with (c) %}{{ c.name }}{% when None %}{% endmatch %}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="2">{% match check %}{% when Some with (c) %}{{ c.description }}{% when None %}{% endmatch %}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="check_type" class="form-label">Check Type</label>
+                        <select class="form-select" id="check_type" name="check_type" required onchange="updateParametersHelp()">
+                            <option value="">Select a type...</option>
+                            <option value="file_exists" {% match check %}{% when Some with (c) %}{% if c.check_type == "file_exists" %}selected{% endif %}{% when None %}{% endmatch %}>file_exists</option>
+                            <option value="file_content" {% match check %}{% when Some with (c) %}{% if c.check_type == "file_content" %}selected{% endif %}{% when None %}{% endmatch %}>file_content</option>
+                            <option value="registry_key" {% match check %}{% when Some with (c) %}{% if c.check_type == "registry_key" %}selected{% endif %}{% when None %}{% endmatch %}>registry_key (Windows)</option>
+                            <option value="config_setting" {% match check %}{% when Some with (c) %}{% if c.check_type == "config_setting" %}selected{% endif %}{% when None %}{% endmatch %}>config_setting</option>
+                            <option value="process_running" {% match check %}{% when Some with (c) %}{% if c.check_type == "process_running" %}selected{% endif %}{% when None %}{% endmatch %}>process_running</option>
+                            <option value="port_open" {% match check %}{% when Some with (c) %}{% if c.check_type == "port_open" %}selected{% endif %}{% when None %}{% endmatch %}>port_open</option>
+                            <option value="command_output" {% match check %}{% when Some with (c) %}{% if c.check_type == "command_output" %}selected{% endif %}{% when None %}{% endmatch %}>command_output</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="parameters" class="form-label">Parameters (JSON)</label>
+                        <textarea class="form-control font-monospace" id="parameters" name="parameters" rows="6" required>{{ parameters_json }}</textarea>
+                        <div id="parameters-help" class="form-text"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="severity" class="form-label">Severity</label>
+                        <select class="form-select" id="severity" name="severity">
+                            <option value="info" {% match check %}{% when Some with (c) %}{% if c.severity.to_string() == "info" %}selected{% endif %}{% when None %}{% endmatch %}>Info</option>
+                            <option value="low" {% match check %}{% when Some with (c) %}{% if c.severity.to_string() == "low" %}selected{% endif %}{% when None %}{% endmatch %}>Low</option>
+                            <option value="medium" {% match check %}{% when Some with (c) %}{% if c.severity.to_string() == "medium" %}selected{% endif %}{% when None %}selected{% endmatch %}>Medium</option>
+                            <option value="high" {% match check %}{% when Some with (c) %}{% if c.severity.to_string() == "high" %}selected{% endif %}{% when None %}{% endmatch %}>High</option>
+                            <option value="critical" {% match check %}{% when Some with (c) %}{% if c.severity.to_string() == "critical" %}selected{% endif %}{% when None %}{% endmatch %}>Critical</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="enabled" name="enabled" value="true"
+                            {% match check %}{% when Some with (c) %}{% if c.enabled %}checked{% endif %}{% when None %}checked{% endmatch %}>
+                        <label class="form-check-label" for="enabled">Enabled</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        {% match check %}{% when Some with (_) %}Update{% when None %}Create{% endmatch %} Check
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Parameter Examples</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>file_exists:</strong></p>
+                <pre class="bg-light p-2"><code>{"path": "/etc/passwd"}</code></pre>
+
+                <p><strong>file_content:</strong></p>
+                <pre class="bg-light p-2"><code>{
+  "path": "/etc/ssh/sshd_config",
+  "pattern": "PermitRootLogin no",
+  "should_match": true
+}</code></pre>
+
+                <p><strong>process_running:</strong></p>
+                <pre class="bg-light p-2"><code>{"name": "nginx"}</code></pre>
+
+                <p><strong>port_open:</strong></p>
+                <pre class="bg-light p-2"><code>{"port": 443}</code></pre>
+
+                <p><strong>command_output:</strong></p>
+                <pre class="bg-light p-2"><code>{
+  "command": "uname -r",
+  "expected_pattern": "^5\\."
+}</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateParametersHelp() {
+    const type = document.getElementById('check_type').value;
+    const help = document.getElementById('parameters-help');
+    const examples = {
+        'file_exists': 'Required: path (string)',
+        'file_content': 'Required: path (string), pattern (regex string), should_match (boolean)',
+        'registry_key': 'Required: path (string). Optional: value_name, expected',
+        'config_setting': 'Required: file (string), key (string), expected (string)',
+        'process_running': 'Required: name (string)',
+        'port_open': 'Required: port (number)',
+        'command_output': 'Required: command (string), expected_pattern (regex string)'
+    };
+    help.textContent = examples[type] || '';
+}
+updateParametersHelp();
+</script>
+{% endblock %}

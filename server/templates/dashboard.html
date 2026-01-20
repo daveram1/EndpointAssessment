@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Endpoints</h5>
+                <p class="card-text display-6">{{ total_endpoints }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Online</h5>
+                <p class="card-text display-6">{{ online_endpoints }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Warning</h5>
+                <p class="card-text display-6">{{ warning_endpoints }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-secondary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Offline</h5>
+                <p class="card-text display-6">{{ offline_endpoints }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Checks Overview</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Total Checks:</strong> {{ total_checks }}</p>
+                <p><strong>Enabled Checks:</strong> {{ enabled_checks }}</p>
+                <a href="/checks" class="btn btn-primary btn-sm">Manage Checks</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <a href="/checks/new" class="btn btn-success btn-sm me-2">
+                    <i class="bi bi-plus"></i> New Check
+                </a>
+                <a href="/endpoints" class="btn btn-info btn-sm">
+                    <i class="bi bi-pc-display"></i> View Endpoints
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Recent Check Results</h5>
+    </div>
+    <div class="card-body">
+        {% if recent_results.is_empty() %}
+        <p class="text-muted">No recent check results.</p>
+        {% else %}
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Check</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in recent_results %}
+                    <tr>
+                        <td>{{ result.endpoint_hostname }}</td>
+                        <td>{{ result.check_name }}</td>
+                        <td>
+                            <span class="badge bg-{{ result.status_class() }}">{{ result.status }}</span>
+                        </td>
+                        <td>{{ result.message.as_deref().unwrap_or("-") }}</td>
+                        <td>{{ result.collected_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
