@@ -1,0 +1,359 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Build binaries for all platforms
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            name: linux-arm64
+            cross: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-amd64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build agent
+        run: cargo build --release -p agent --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Build server
+        if: matrix.name == 'linux-amd64'
+        run: cargo build --release -p server --target ${{ matrix.target }}
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp target/${{ matrix.target }}/release/agent.exe dist/endpoint-agent-${{ matrix.name }}.exe
+          else
+            cp target/${{ matrix.target }}/release/agent dist/endpoint-agent-${{ matrix.name }}
+          fi
+          if [[ "${{ matrix.name }}" == "linux-amd64" ]]; then
+            cp target/${{ matrix.target }}/release/server dist/endpoint-server-${{ matrix.name }}
+          fi
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.name }}
+          path: dist/*
+
+  # Build Linux packages
+  package-linux:
+    name: Package (Linux)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+          cargo install cargo-deb --locked
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-x86_64-unknown-linux-gnu-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --release -p agent
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "agent") | .version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build DEB package
+        run: |
+          # Append deb metadata to Cargo.toml if not present
+          if ! grep -q '\[package.metadata.deb\]' agent/Cargo.toml; then
+            cat packaging/linux/deb/cargo-deb.toml >> agent/Cargo.toml
+          fi
+          cargo deb -p agent --no-build
+          mkdir -p dist
+          cp target/debian/*.deb dist/
+
+      - name: Build RPM package
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS,RPMS}
+
+          # Create tarball
+          tar czf ~/rpmbuild/SOURCES/endpoint-agent-$VERSION.tar.gz \
+            --transform "s,^,endpoint-agent-$VERSION/," \
+            --exclude='target' \
+            --exclude='.git' \
+            .
+
+          # Update spec file version and fix build
+          sed -e "s/Version:.*/Version:        $VERSION/" \
+              -e "s|^cargo build|# cargo build|" \
+              -e "s|target/release/agent|$(pwd)/target/release/agent|" \
+              packaging/linux/rpm/endpoint-agent.spec > ~/rpmbuild/SPECS/endpoint-agent.spec
+
+          # Build RPM (skip build step, use pre-built binary)
+          rpmbuild -bb --define "_sourcedir $(pwd)" --define "_builddir $(pwd)" ~/rpmbuild/SPECS/endpoint-agent.spec || true
+
+          # Copy to dist
+          cp ~/rpmbuild/RPMS/*/*.rpm dist/ 2>/dev/null || echo "RPM build skipped"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux
+          path: dist/*
+
+  # Build macOS package
+  package-macos:
+    name: Package (macOS)
+    needs: build
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-universal-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "agent") | .version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build universal binary
+        run: |
+          cargo build --release -p agent --target x86_64-apple-darwin
+          cargo build --release -p agent --target aarch64-apple-darwin
+
+          mkdir -p target/release
+          lipo -create \
+            target/x86_64-apple-darwin/release/agent \
+            target/aarch64-apple-darwin/release/agent \
+            -output target/release/agent
+
+      - name: Build PKG installer
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist
+
+          chmod +x packaging/macos/pkg/scripts/*
+
+          STAGING=$(mktemp -d)
+          mkdir -p "$STAGING/usr/local/bin"
+          mkdir -p "$STAGING/Library/LaunchDaemons"
+
+          cp target/release/agent "$STAGING/usr/local/bin/endpoint-agent"
+          cp packaging/macos/launchd/com.endpointassessment.agent.plist "$STAGING/Library/LaunchDaemons/"
+
+          pkgbuild \
+            --root "$STAGING" \
+            --scripts packaging/macos/pkg/scripts \
+            --identifier "com.endpointassessment.agent" \
+            --version "$VERSION" \
+            --install-location "/" \
+            "dist/endpoint-agent-$VERSION-macos-universal.pkg"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos
+          path: dist/*
+
+  # Build Windows package
+  package-windows:
+    name: Package (Windows)
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-x86_64-pc-windows-msvc-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Get version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --format-version 1 --no-deps | ConvertFrom-Json).packages | Where-Object { $_.name -eq "agent" } | Select-Object -ExpandProperty version
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build release binary
+        run: cargo build --release -p agent
+
+      - name: Create Windows package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+
+          New-Item -ItemType Directory -Force -Path dist
+          New-Item -ItemType Directory -Force -Path "dist\endpoint-agent"
+
+          Copy-Item "target\release\agent.exe" "dist\endpoint-agent\endpoint-agent.exe"
+          Copy-Item "packaging\windows\wix\readme.txt" "dist\endpoint-agent\"
+
+          # Create install script
+          @"
+          @echo off
+          echo Installing Endpoint Assessment Agent...
+          if not exist "%ProgramFiles%\EndpointAgent" mkdir "%ProgramFiles%\EndpointAgent"
+          copy /Y endpoint-agent.exe "%ProgramFiles%\EndpointAgent\endpoint-agent.exe"
+          "%ProgramFiles%\EndpointAgent\endpoint-agent.exe" --install
+          echo.
+          echo Installation complete!
+          echo.
+          echo Next steps:
+          echo 1. Set environment variables:
+          echo    setx /M SERVER_URL "http://your-server:8080"
+          echo    setx /M AGENT_SECRET "your-secret"
+          echo 2. Start the service:
+          echo    sc start EndpointAgent
+          pause
+          "@ | Out-File -FilePath "dist\endpoint-agent\install.bat" -Encoding ASCII
+
+          # Create uninstall script
+          @"
+          @echo off
+          echo Uninstalling Endpoint Assessment Agent...
+          "%ProgramFiles%\EndpointAgent\endpoint-agent.exe" --uninstall
+          timeout /t 2 /nobreak >nul
+          rmdir /s /q "%ProgramFiles%\EndpointAgent"
+          echo Uninstallation complete!
+          pause
+          "@ | Out-File -FilePath "dist\endpoint-agent\uninstall.bat" -Encoding ASCII
+
+          # Create zip
+          Compress-Archive -Path "dist\endpoint-agent\*" -DestinationPath "dist\endpoint-agent-$version-windows-x64.zip" -Force
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows
+          path: dist/*.zip
+
+  # Create GitHub Release
+  release:
+    name: Create Release
+    needs: [build, package-linux, package-macos, package-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize release files
+        run: |
+          mkdir -p release
+
+          # Copy binaries
+          find artifacts/binaries-* -type f -exec cp {} release/ \;
+
+          # Copy packages
+          find artifacts/packages-* -type f -exec cp {} release/ \;
+
+          ls -la release/
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release/*
