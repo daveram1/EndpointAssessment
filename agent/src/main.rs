@@ -2,6 +2,8 @@ mod checks;
 mod client;
 mod collectors;
 mod config;
+#[cfg(windows)]
+mod service;
 
 use std::time::Duration;
 
@@ -9,7 +11,6 @@ use chrono::Utc;
 use common::{AgentCheckResult, RegisterRequest};
 use tokio::time::interval;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use uuid::Uuid;
 
 use crate::checks::CheckExecutor;
 use crate::client::ServerClient;
@@ -18,8 +19,60 @@ use crate::config::Config;
 
 const AGENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn print_usage() {
+    eprintln!("Endpoint Assessment Agent v{}", AGENT_VERSION);
+    eprintln!();
+    eprintln!("USAGE:");
+    eprintln!("    agent [OPTIONS] [SERVER_URL] [AGENT_SECRET]");
+    eprintln!();
+    eprintln!("OPTIONS:");
+    eprintln!("    -h, --help       Print this help message");
+    #[cfg(windows)]
+    {
+        eprintln!("    --service        Run as Windows service");
+        eprintln!("    --install        Install as Windows service");
+        eprintln!("    --uninstall      Uninstall Windows service");
+    }
+    eprintln!();
+    eprintln!("ENVIRONMENT VARIABLES:");
+    eprintln!("    SERVER_URL               Server URL (required if not passed as argument)");
+    eprintln!("    AGENT_SECRET             Agent secret (required if not passed as argument)");
+    eprintln!("    COLLECTION_INTERVAL_SECS Collection interval in seconds (default: 300)");
+    eprintln!("    HOSTNAME_OVERRIDE        Override detected hostname");
+    eprintln!("    RUST_LOG                 Log level (default: info)");
+}
+
+fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+
+    // Handle help
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        print_usage();
+        return Ok(());
+    }
+
+    // Handle Windows service commands
+    #[cfg(windows)]
+    {
+        if args.iter().any(|a| a == "--install") {
+            return service::windows::install_service();
+        }
+        if args.iter().any(|a| a == "--uninstall") {
+            return service::windows::uninstall_service();
+        }
+        if args.iter().any(|a| a == "--service") {
+            // Run as Windows service
+            service::windows::run_as_service()?;
+            return Ok(());
+        }
+    }
+
+    // Run in standalone mode
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(run_agent())
+}
+
+pub async fn run_agent() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -31,8 +84,11 @@ async fn main() -> anyhow::Result<()> {
     // Load .env if present
     let _ = dotenvy::dotenv();
 
-    // Parse command line arguments
-    let args: Vec<String> = std::env::args().collect();
+    // Parse command line arguments (skip service-related args)
+    let args: Vec<String> = std::env::args()
+        .filter(|a| !a.starts_with("--"))
+        .collect();
+
     let config = if args.len() >= 3 {
         // Command line: agent <server_url> <agent_secret>
         let server_url = args.get(1).map(|s| s.as_str()).unwrap_or("http://localhost:8080");

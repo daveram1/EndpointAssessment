@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+# Reload systemd
+systemctl daemon-reload
+
+echo ""
+echo "========================================"
+echo "Endpoint Assessment Agent installed!"
+echo "========================================"
+echo ""
+echo "Next steps:"
+echo "1. Edit configuration: sudo nano /etc/endpoint-agent/agent.conf"
+echo "2. Set SERVER_URL and AGENT_SECRET"
+echo "3. Enable and start: sudo systemctl enable --now endpoint-agent"
+echo "4. Check status: sudo systemctl status endpoint-agent"
+echo ""
+
+exit 0

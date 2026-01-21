@@ -70,6 +70,90 @@ export AGENT_SECRET=your-agent-secret
 cargo run -p agent
 ```
 
+## Agent Installation Packages
+
+Pre-built installer packages are available for easy deployment.
+
+### Linux (DEB - Debian/Ubuntu)
+
+```bash
+# Install
+sudo dpkg -i endpoint-agent-0.1.0-amd64.deb
+
+# Configure
+sudo nano /etc/endpoint-agent/agent.conf
+
+# Start service
+sudo systemctl enable --now endpoint-agent
+```
+
+### Linux (RPM - RHEL/Fedora)
+
+```bash
+# Install
+sudo rpm -i endpoint-agent-0.1.0.x86_64.rpm
+
+# Configure
+sudo nano /etc/endpoint-agent/agent.conf
+
+# Start service
+sudo systemctl enable --now endpoint-agent
+```
+
+### macOS
+
+```bash
+# Install
+sudo installer -pkg endpoint-agent-0.1.0-macos-arm64.pkg -target /
+
+# Configure (edit the plist file)
+sudo nano /Library/LaunchDaemons/com.endpointassessment.agent.plist
+
+# Start service
+sudo launchctl load /Library/LaunchDaemons/com.endpointassessment.agent.plist
+```
+
+### Windows
+
+```powershell
+# Install (with configuration)
+msiexec /i endpoint-agent-0.1.0-windows-x64.msi SERVER_URL=http://your-server:8080 AGENT_SECRET=your-secret
+
+# Or install and configure separately
+msiexec /i endpoint-agent-0.1.0-windows-x64.msi
+
+# Set environment variables
+[System.Environment]::SetEnvironmentVariable('SERVER_URL', 'http://your-server:8080', 'Machine')
+[System.Environment]::SetEnvironmentVariable('AGENT_SECRET', 'your-secret', 'Machine')
+
+# Start service
+sc start EndpointAgent
+```
+
+### Building Packages
+
+To build installer packages from source:
+
+```bash
+# Build all packages for current platform
+./packaging/build.sh
+
+# Build specific package types
+./packaging/build.sh linux-deb
+./packaging/build.sh linux-rpm
+./packaging/build.sh macos-pkg      # macOS only
+./packaging/build.sh windows-msi    # Windows only
+
+# With custom version
+./packaging/build.sh -v 1.0.0 linux-deb linux-rpm
+```
+
+**Requirements:**
+- Linux DEB: `cargo install cargo-deb`
+- Linux RPM: `rpm-build` package
+- macOS PKG: Xcode command line tools
+- Windows MSI: [WiX Toolset v3](https://wixtoolset.org/)
+
 ## Configuration
 
 ### Server Environment Variables

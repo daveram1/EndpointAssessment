@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+# Stop existing service if running
+if launchctl list | grep -q com.endpointassessment.agent; then
+    launchctl unload /Library/LaunchDaemons/com.endpointassessment.agent.plist 2>/dev/null || true
+fi
+
+# Create directories
+mkdir -p /var/log/endpoint-agent
+mkdir -p /var/lib/endpoint-agent
+mkdir -p /usr/local/etc/endpoint-agent
+
+exit 0

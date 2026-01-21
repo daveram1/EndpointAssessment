@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.endpointassessment.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/endpoint-agent</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SERVER_URL</key>
+        <string>http://your-server:8080</string>
+        <key>AGENT_SECRET</key>
+        <string>change-me-in-production</string>
+        <key>COLLECTION_INTERVAL_SECS</key>
+        <string>300</string>
+        <key>RUST_LOG</key>
+        <string>info</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>NetworkState</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/endpoint-agent/agent.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/var/log/endpoint-agent/agent.err</string>
+
+    <key>WorkingDirectory</key>
+    <string>/var/lib/endpoint-agent</string>
+</dict>
+</plist>

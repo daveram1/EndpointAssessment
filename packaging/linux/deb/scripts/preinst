@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+# Create service user if it doesn't exist
+if ! getent passwd endpoint-agent > /dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin endpoint-agent
+fi
+
+# Create log directory
+mkdir -p /var/log/endpoint-agent
+chown endpoint-agent:endpoint-agent /var/log/endpoint-agent
+
+exit 0

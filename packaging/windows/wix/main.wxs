@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="*"
+             Name="Endpoint Assessment Agent"
+             Language="1033"
+             Version="0.1.0"
+             Manufacturer="Endpoint Assessment"
+             UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+
+        <Package InstallerVersion="500"
+                 Compressed="yes"
+                 InstallScope="perMachine"
+                 Description="Endpoint Assessment Agent"
+                 Comments="Endpoint monitoring and compliance checking agent" />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <MediaTemplate EmbedCab="yes" />
+
+        <Feature Id="ProductFeature" Title="Endpoint Assessment Agent" Level="1">
+            <ComponentGroupRef Id="ProductComponents" />
+            <ComponentRef Id="ApplicationShortcut" />
+        </Feature>
+
+        <!-- Custom actions for service management -->
+        <CustomAction Id="InstallService"
+                      FileKey="AgentExe"
+                      ExeCommand="--install"
+                      Execute="deferred"
+                      Impersonate="no"
+                      Return="check" />
+
+        <CustomAction Id="UninstallService"
+                      FileKey="AgentExe"
+                      ExeCommand="--uninstall"
+                      Execute="deferred"
+                      Impersonate="no"
+                      Return="ignore" />
+
+        <InstallExecuteSequence>
+            <Custom Action="UninstallService" Before="RemoveFiles">(NOT UPGRADINGPRODUCTCODE) AND (REMOVE="ALL")</Custom>
+            <Custom Action="InstallService" After="InstallFiles">NOT Installed</Custom>
+        </InstallExecuteSequence>
+
+        <!-- UI -->
+        <UIRef Id="WixUI_Minimal" />
+        <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    </Product>
+
+    <Fragment>
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="INSTALLFOLDER" Name="Endpoint Assessment Agent">
+                    <Directory Id="LogFolder" Name="logs" />
+                </Directory>
+            </Directory>
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="Endpoint Assessment Agent" />
+            </Directory>
+        </Directory>
+    </Fragment>
+
+    <Fragment>
+        <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+            <Component Id="AgentExecutable" Guid="*">
+                <File Id="AgentExe"
+                      Name="endpoint-agent.exe"
+                      Source="$(var.AgentPath)"
+                      KeyPath="yes" />
+
+                <!-- Environment variables for service configuration -->
+                <Environment Id="ServerUrl"
+                             Name="SERVER_URL"
+                             Value="[SERVER_URL]"
+                             Permanent="no"
+                             Part="all"
+                             Action="set"
+                             System="yes" />
+                <Environment Id="AgentSecret"
+                             Name="AGENT_SECRET"
+                             Value="[AGENT_SECRET]"
+                             Permanent="no"
+                             Part="all"
+                             Action="set"
+                             System="yes" />
+            </Component>
+
+            <Component Id="ReadmeFile" Guid="*">
+                <File Id="Readme"
+                      Name="README.txt"
+                      Source="readme.txt"
+                      KeyPath="yes" />
+            </Component>
+        </ComponentGroup>
+
+        <Component Id="ApplicationShortcut" Guid="*" Directory="ApplicationProgramsFolder">
+            <Shortcut Id="UninstallShortcut"
+                      Name="Uninstall Endpoint Agent"
+                      Target="[SystemFolder]msiexec.exe"
+                      Arguments="/x [ProductCode]" />
+            <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
+            <RegistryValue Root="HKCU"
+                           Key="Software\EndpointAssessment\Agent"
+                           Name="installed"
+                           Type="integer"
+                           Value="1"
+                           KeyPath="yes" />
+        </Component>
+    </Fragment>
+</Wix>

@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+# Set permissions
+chmod 755 /usr/local/bin/endpoint-agent
+chmod 644 /Library/LaunchDaemons/com.endpointassessment.agent.plist
+chown root:wheel /Library/LaunchDaemons/com.endpointassessment.agent.plist
+
+echo ""
+echo "========================================"
+echo "Endpoint Assessment Agent installed!"
+echo "========================================"
+echo ""
+echo "Next steps:"
+echo "1. Edit the launch daemon configuration:"
+echo "   sudo nano /Library/LaunchDaemons/com.endpointassessment.agent.plist"
+echo ""
+echo "2. Set SERVER_URL and AGENT_SECRET in the EnvironmentVariables section"
+echo ""
+echo "3. Load and start the service:"
+echo "   sudo launchctl load /Library/LaunchDaemons/com.endpointassessment.agent.plist"
+echo ""
+echo "4. Check status:"
+echo "   sudo launchctl list | grep endpoint"
+echo "   tail -f /var/log/endpoint-agent/agent.log"
+echo ""
+
+exit 0

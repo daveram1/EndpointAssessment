@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "purge" ]; then
+    # Remove user
+    if getent passwd endpoint-agent > /dev/null 2>&1; then
+        userdel endpoint-agent 2>/dev/null || true
+    fi
+
+    # Remove log directory
+    rm -rf /var/log/endpoint-agent
+
+    # Remove config directory
+    rm -rf /etc/endpoint-agent
+fi
+
+# Reload systemd
+systemctl daemon-reload
+
+exit 0

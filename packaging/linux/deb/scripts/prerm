@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+# Stop and disable service if running
+if systemctl is-active --quiet endpoint-agent; then
+    systemctl stop endpoint-agent
+fi
+
+if systemctl is-enabled --quiet endpoint-agent 2>/dev/null; then
+    systemctl disable endpoint-agent
+fi
+
+exit 0

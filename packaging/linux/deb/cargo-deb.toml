@@ -1,0 +1,28 @@
+# Debian package configuration for cargo-deb
+# Install: cargo install cargo-deb
+# Build: cargo deb -p agent
+
+[package.metadata.deb]
+name = "endpoint-agent"
+maintainer = "Endpoint Assessment Team <support@example.com>"
+copyright = "2024, Endpoint Assessment Team"
+license-file = ["../LICENSE", "0"]
+extended-description = """\
+Endpoint Assessment Agent collects system information and executes \
+compliance checks on endpoints, reporting results to a central server. \
+Supports file checks, process monitoring, port scanning, and custom commands."""
+section = "admin"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/agent", "usr/bin/endpoint-agent", "755"],
+    ["packaging/linux/systemd/endpoint-agent.service", "lib/systemd/system/endpoint-agent.service", "644"],
+    ["packaging/linux/systemd/agent.conf", "etc/endpoint-agent/agent.conf", "640"],
+]
+conf-files = ["/etc/endpoint-agent/agent.conf"]
+maintainer-scripts = "packaging/linux/deb/scripts"
+
+[package.metadata.deb.systemd-units]
+unit-scripts = "packaging/linux/systemd"
+enable = false
+start = false

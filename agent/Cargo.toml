@@ -37,3 +37,4 @@ regex = { workspace = true }
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+windows-service = "0.6"
